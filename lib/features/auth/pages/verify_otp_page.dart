@@ -5,6 +5,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../data/services/api_service_factory.dart';
+import '../../../data/services/auth_storage_service.dart';
 import '../../../routes/app_routes.dart';
 
 class VerifyOtpPage extends StatefulWidget {
@@ -33,6 +34,7 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
   final AuthService _authService = AuthService(
     apiService: ApiServiceFactory.getInstance(),
   );
+  final AuthStorageService _authStorage = AuthStorageService();
 
   @override
   void initState() {
@@ -79,8 +81,17 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
         otpCode: otp,
       );
 
-      if (response.accessToken != null) {
-        // Store tokens and navigate to home
+      if (response.accessToken != null && response.refreshToken != null) {
+        // Store tokens
+        await _authStorage.saveTokens(
+          accessToken: response.accessToken!,
+          refreshToken: response.refreshToken!,
+        );
+        
+        // Update API service with access token
+        ApiServiceFactory.getInstance().setAccessToken(response.accessToken);
+        
+        // Navigate to home
         if (mounted) {
           Navigator.of(context).pushReplacementNamed(AppRoutes.home);
         }
@@ -140,6 +151,11 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
+        elevation: 0,
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -254,26 +270,6 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
                       ],
                     ),
                   ),
-                const SizedBox(height: 24),
-                Center(
-                  child: TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pushReplacementNamed(AppRoutes.register);
-                    },
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      minimumSize: const Size(50, 44),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: Text(
-                      '← Kembali ke daftar',
-                      style: AppTextStyles.bodyMedium(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
               ],
             ),
           ),

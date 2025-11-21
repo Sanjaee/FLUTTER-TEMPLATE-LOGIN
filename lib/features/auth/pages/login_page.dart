@@ -6,6 +6,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../data/services/api_service_factory.dart';
+import '../../../data/services/auth_storage_service.dart';
 import '../../../routes/app_routes.dart';
 
 class LoginPage extends StatefulWidget {
@@ -25,6 +26,7 @@ class _LoginPageState extends State<LoginPage> {
   final AuthService _authService = AuthService(
     apiService: ApiServiceFactory.getInstance(),
   );
+  final AuthStorageService _authStorage = AuthStorageService();
 
   @override
   void dispose() {
@@ -48,8 +50,16 @@ class _LoginPageState extends State<LoginPage> {
         password: _passwordController.text,
       );
 
-      if (response.accessToken != null) {
-        // Store tokens (you can use shared_preferences or secure_storage)
+      if (response.accessToken != null && response.refreshToken != null) {
+        // Store tokens
+        await _authStorage.saveTokens(
+          accessToken: response.accessToken!,
+          refreshToken: response.refreshToken!,
+        );
+        
+        // Update API service with access token
+        ApiServiceFactory.getInstance().setAccessToken(response.accessToken);
+        
         // Navigate to home
         if (mounted) {
           Navigator.of(context).pushReplacementNamed(AppRoutes.home);
@@ -79,6 +89,11 @@ class _LoginPageState extends State<LoginPage> {
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
+        elevation: 0,
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),

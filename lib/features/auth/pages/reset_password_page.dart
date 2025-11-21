@@ -81,6 +81,11 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
+        elevation: 0,
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -128,26 +133,6 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                   text: 'Kirim Kode OTP',
                   onPressed: _handleRequestReset,
                   isLoading: _isLoading,
-                ),
-                const SizedBox(height: 24),
-                Center(
-                  child: TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pushNamed(AppRoutes.login);
-                    },
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      minimumSize: const Size(50, 44),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: Text(
-                      '← Kembali ke login',
-                      style: AppTextStyles.bodyMedium(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
                 ),
               ],
             ),

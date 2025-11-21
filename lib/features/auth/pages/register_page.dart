@@ -93,6 +93,11 @@ class _RegisterPageState extends State<RegisterPage> {
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
+        elevation: 0,
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),

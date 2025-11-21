@@ -15,6 +15,7 @@ class HomePage extends StatelessWidget {
       backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
       appBar: CustomAppBar(
         title: 'BeRealTime',
+        leading: const SizedBox.shrink(),
         onProfileTap: () {
           Navigator.of(context).pushNamed(AppRoutes.profile);
         },
