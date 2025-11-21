@@ -95,58 +95,70 @@ class MyApp extends StatelessWidget {
         );
       },
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        // Smooth EaseOutSlide transition (like Gojek/startup apps)
-        final slideAnimation = Tween<Offset>(
-          begin: const Offset(1.0, 0.0), // Slide from right
-          end: Offset.zero,
-        ).animate(
-          CurvedAnimation(
-            parent: animation,
-            curve: const EaseOutSlideCurve(), // Custom smooth ease out curve
-          ),
-        );
-
-        // Subtle fade for extra smoothness
+        // Ultra-smooth fade with subtle scale for premium feel
+        // No slide = no patah-patah, just clean and smooth
+        
+        // Main fade animation with smooth curve
         final fadeAnimation = Tween<double>(
           begin: 0.0,
           end: 1.0,
         ).animate(
           CurvedAnimation(
             parent: animation,
-            curve: const Interval(0.0, 0.8, curve: Curves.easeOut), // Quick fade in
+            curve: const SmoothFadeCurve(), // Custom ultra-smooth curve
           ),
         );
 
-        // Combine slide and fade for premium smooth transition
-        return SlideTransition(
-          position: slideAnimation,
-          child: FadeTransition(
-            opacity: fadeAnimation,
+        // Subtle scale animation for depth (95% to 100%)
+        final scaleAnimation = Tween<double>(
+          begin: 0.98,
+          end: 1.0,
+        ).animate(
+          CurvedAnimation(
+            parent: animation,
+            curve: const SmoothScaleCurve(), // Smooth scale curve
+          ),
+        );
+
+        // Combine fade and scale for ultra-smooth transition
+        return FadeTransition(
+          opacity: fadeAnimation,
+          child: ScaleTransition(
+            scale: scaleAnimation,
             child: child,
           ),
         );
       },
-      transitionDuration: const Duration(milliseconds: 350), // Optimal duration for smoothness
+      transitionDuration: const Duration(milliseconds: 300), // Fast and smooth
     );
   }
 }
 
-// Custom EaseOutSlide curve for smooth transitions (like Gojek/startup apps)
-class EaseOutSlideCurve extends Curve {
-  const EaseOutSlideCurve();
+// Ultra-smooth fade curve - no patah-patah, just clean animation
+// Using cubic ease-out for buttery smooth feel (similar to iOS animations)
+class SmoothFadeCurve extends Curve {
+  const SmoothFadeCurve();
 
   @override
   double transformInternal(double t) {
-    // Smooth ease out curve: starts fast, ends slow
-    // Using cubic bezier-like easing for natural feel
-    if (t < 0.5) {
-      // First half: accelerate
-      return 2 * t * t;
-    } else {
-      // Second half: decelerate smoothly
-      final double f = t - 1.0;
-      return 1.0 - (2 * f * f);
-    }
+    // Cubic ease-out: smooth start, very smooth end
+    // Formula: 1 - (1-t)^3 for natural deceleration
+    final double invT = 1.0 - t;
+    return 1.0 - (invT * invT * invT);
+  }
+}
+
+// Smooth scale curve - subtle zoom for premium feel
+// Matches fade timing for synchronized smoothness
+class SmoothScaleCurve extends Curve {
+  const SmoothScaleCurve();
+
+  @override
+  double transformInternal(double t) {
+    // Slightly faster scale for natural feel
+    // Ease-out cubic with faster start
+    final double invT = 1.0 - t;
+    return 1.0 - (invT * invT);
   }
 }
 
