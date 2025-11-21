@@ -5,6 +5,8 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../routes/app_routes.dart';
 import '../../../data/models/user_model.dart';
+import '../../../data/services/auth_storage_service.dart';
+import '../../../data/services/api_service_factory.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -61,14 +63,22 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
     );
 
-    if (confirm == true) {
-      // TODO: Clear tokens and user data from storage
-      // Clear access token
+    if (confirm == true && mounted) {
+      // Clear access token from API service first
+      ApiServiceFactory.getInstance().setAccessToken(null);
       
+      // Clear tokens from storage
+      final authStorage = AuthStorageService();
+      await authStorage.clearTokens();
+      
+      // Wait a bit to ensure tokens are cleared
+      await Future.delayed(const Duration(milliseconds: 100));
+      
+      // Navigate to login and remove ALL previous routes
       if (mounted) {
         Navigator.of(context).pushNamedAndRemoveUntil(
           AppRoutes.login,
-          (route) => false,
+          (route) => false, // Remove all previous routes - cannot go back
         );
       }
     }

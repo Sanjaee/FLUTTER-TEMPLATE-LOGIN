@@ -95,24 +95,58 @@ class MyApp extends StatelessWidget {
         );
       },
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        // Slide transition only
+        // Smooth EaseOutSlide transition (like Gojek/startup apps)
         final slideAnimation = Tween<Offset>(
-          begin: const Offset(0.3, 0.0),
+          begin: const Offset(1.0, 0.0), // Slide from right
           end: Offset.zero,
         ).animate(
           CurvedAnimation(
             parent: animation,
-            curve: Curves.easeInOut,
+            curve: const EaseOutSlideCurve(), // Custom smooth ease out curve
           ),
         );
 
+        // Subtle fade for extra smoothness
+        final fadeAnimation = Tween<double>(
+          begin: 0.0,
+          end: 1.0,
+        ).animate(
+          CurvedAnimation(
+            parent: animation,
+            curve: const Interval(0.0, 0.8, curve: Curves.easeOut), // Quick fade in
+          ),
+        );
+
+        // Combine slide and fade for premium smooth transition
         return SlideTransition(
           position: slideAnimation,
-          child: child,
+          child: FadeTransition(
+            opacity: fadeAnimation,
+            child: child,
+          ),
         );
       },
-      transitionDuration: const Duration(milliseconds: 300),
+      transitionDuration: const Duration(milliseconds: 350), // Optimal duration for smoothness
     );
+  }
+}
+
+// Custom EaseOutSlide curve for smooth transitions (like Gojek/startup apps)
+class EaseOutSlideCurve extends Curve {
+  const EaseOutSlideCurve();
+
+  @override
+  double transformInternal(double t) {
+    // Smooth ease out curve: starts fast, ends slow
+    // Using cubic bezier-like easing for natural feel
+    if (t < 0.5) {
+      // First half: accelerate
+      return 2 * t * t;
+    } else {
+      // Second half: decelerate smoothly
+      final double f = t - 1.0;
+      return 1.0 - (2 * f * f);
+    }
   }
 }
 
@@ -140,17 +174,25 @@ class _AuthGuardWidgetState extends State<_AuthGuardWidget> {
   }
 
   Future<void> _checkAuth() async {
-    // Check if user is logged in and trying to access auth route
-    final redirectTo = await AuthGuard.guardAuthRoute(
+    // First check: if user is logged in and trying to access auth route
+    var redirectTo = await AuthGuard.guardAuthRoute(
       widget.routeName,
       context,
     );
 
+    // Second check: if user is NOT logged in and trying to access protected route
+    if (redirectTo == null) {
+      redirectTo = await AuthGuard.guardProtectedRoute(
+        widget.routeName,
+        context,
+      );
+    }
+
     if (mounted) {
       if (redirectTo != null) {
-        // Redirect needed - navigate to home
+        // Redirect needed - navigate to appropriate route
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          Navigator.of(context).pushReplacementNamed(redirectTo);
+          Navigator.of(context).pushReplacementNamed(redirectTo!);
         });
       } else {
         setState(() {

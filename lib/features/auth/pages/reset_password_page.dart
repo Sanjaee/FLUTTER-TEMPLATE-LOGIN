@@ -82,9 +82,18 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     return Scaffold(
       backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
       appBar: AppBar(
-        automaticallyImplyLeading: false,
+        automaticallyImplyLeading: true,
         backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
         elevation: 0,
+        leading: IconButton(
+          icon: Icon(
+            Icons.arrow_back,
+            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+          ),
+          onPressed: () {
+            Navigator.of(context).pushReplacementNamed(AppRoutes.login);
+          },
+        ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
