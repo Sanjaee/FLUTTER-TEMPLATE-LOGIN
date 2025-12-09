@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import '../../../core/widgets/primary_button.dart';
-import '../../../core/widgets/input_field.dart';
-import '../../../core/utils/validators.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/text_styles.dart';
+import '../../../core/constants/app_text_styles.dart';
+import '../../../core/widgets/custom_button.dart';
+import '../../../core/widgets/custom_text_field.dart';
+import '../../../core/utils/validators.dart';
+import '../../../core/utils/navigation.dart';
 import '../../../data/services/auth_service.dart';
-import '../../../data/services/api_service_factory.dart';
 import '../../../routes/app_routes.dart';
 
 class ResetPasswordPage extends StatefulWidget {
@@ -20,48 +20,36 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   final _emailController = TextEditingController();
   bool _isLoading = false;
 
-  final AuthService _authService = AuthService(
-    apiService: ApiServiceFactory.getInstance(),
-  );
-
   @override
   void dispose() {
     _emailController.dispose();
     super.dispose();
   }
 
-  Future<void> _handleRequestReset() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+  Future<void> _requestReset() async {
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() {
       _isLoading = true;
     });
 
     try {
-      await _authService.requestResetPassword(
-        email: _emailController.text.trim(),
-      );
+      final authService = AuthService();
+      await authService.requestResetPassword(_emailController.text.trim());
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Kode OTP telah dikirim ke email Anda'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-        // Navigate to verify OTP reset page
-        Navigator.of(context).pushNamed(
-          AppRoutes.verifyOtpReset,
-          arguments: {'email': _emailController.text.trim()},
+        // Navigate to OTP verification page for password reset
+        NavigationHelper.pushTo(
+          context,
+          AppRoutes.verifyOtp,
+          arguments: {'email': _emailController.text.trim(), 'isPasswordReset': true},
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString().replaceFirst('Exception: ', '')),
+            content: Text(e.toString()),
             backgroundColor: AppColors.error,
           ),
         );
@@ -77,72 +65,105 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        automaticallyImplyLeading: true,
-        backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
+        backgroundColor: AppColors.background,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back,
-            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-          ),
-          onPressed: () {
-            Navigator.of(context).pushReplacementNamed(AppRoutes.login);
-          },
+          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          onPressed: () => NavigationHelper.goBack(context),
         ),
+        title: Text('Reset Password', style: AppTextStyles.h3),
+        centerTitle: true,
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: Padding(
           padding: const EdgeInsets.all(24.0),
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 40),
-                Icon(
-                  Icons.lock_reset,
-                  size: 48,
-                  color: AppColors.primary,
+                const Spacer(),
+
+                // Icon
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: const BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.lock_reset_outlined,
+                    color: AppColors.textOnPrimary,
+                    size: 40,
+                  ),
                 ),
+
                 const SizedBox(height: 24),
+
+                // Title
                 Text(
-                  'Reset Password',
-                  style: AppTextStyles.h1(
-                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                  ),
+                  'Forgot Password?',
+                  style: AppTextStyles.h2,
                   textAlign: TextAlign.center,
                 ),
+
                 const SizedBox(height: 8),
+
+                // Description
                 Text(
-                  'Masukkan email Anda untuk menerima kode OTP reset password',
-                  style: AppTextStyles.bodyMedium(
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                  'Enter your email address and we\'ll send you a code to reset your password.',
+                  style: AppTextStyles.bodyLarge.copyWith(
+                    color: AppColors.textSecondary,
                   ),
                   textAlign: TextAlign.center,
                 ),
+
                 const SizedBox(height: 48),
-                InputField(
+
+                // Email field
+                CustomTextField(
                   label: 'Email',
-                  hint: 'Masukkan email Anda',
+                  hint: 'Enter your email address',
                   controller: _emailController,
                   validator: Validators.email,
                   keyboardType: TextInputType.emailAddress,
-                  prefixIcon: Icon(
-                    Icons.email_outlined,
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                  ),
+                  textInputAction: TextInputAction.done,
+                  prefixIcon: const Icon(Icons.email_outlined),
                 ),
-                const SizedBox(height: 24),
-                PrimaryButton(
-                  text: 'Kirim Kode OTP',
-                  onPressed: _handleRequestReset,
+
+                const SizedBox(height: 32),
+
+                // Send code button
+                CustomButton(
+                  text: 'Send Reset Code',
+                  onPressed: _requestReset,
                   isLoading: _isLoading,
                 ),
+
+                const Spacer(),
+
+                // Back to login
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      "Remember your password? ",
+                      style: AppTextStyles.bodyMedium,
+                    ),
+                    CustomTextButton(
+                      text: 'Sign In',
+                      onPressed: () {
+                        NavigationHelper.goBack(context);
+                      },
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
               ],
             ),
           ),
@@ -151,4 +172,3 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     );
   }
 }
-

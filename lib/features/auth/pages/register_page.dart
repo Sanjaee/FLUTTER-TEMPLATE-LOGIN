@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import '../../../core/widgets/primary_button.dart';
-import '../../../core/widgets/input_field.dart';
-import '../../../core/utils/validators.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/text_styles.dart';
+import '../../../core/constants/app_text_styles.dart';
+import '../../../core/widgets/custom_button.dart';
+import '../../../core/widgets/custom_text_field.dart';
+import '../../../core/utils/validators.dart';
+import '../../../core/utils/navigation.dart';
 import '../../../data/services/auth_service.dart';
-import '../../../data/services/api_service_factory.dart';
+import '../../../data/models/user_model.dart';
 import '../../../routes/app_routes.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -17,63 +18,55 @@ class RegisterPage extends StatefulWidget {
 
 class _RegisterPageState extends State<RegisterPage> {
   final _formKey = GlobalKey<FormState>();
-  final _usernameController = TextEditingController();
+  final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+
+  bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-  bool _isLoading = false;
-
-  final AuthService _authService = AuthService(
-    apiService: ApiServiceFactory.getInstance(),
-  );
 
   @override
   void dispose() {
-    _usernameController.dispose();
+    _fullNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  Future<void> _handleRegister() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+  Future<void> _register() async {
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final response = await _authService.register(
-        fullName: _usernameController.text.trim(),
+      final authService = AuthService();
+      final request = RegisterRequest(
+        fullName: _fullNameController.text.trim(),
         email: _emailController.text.trim(),
         password: _passwordController.text,
-        userType: 'member',
+        userType: 'member', // Default user type
       );
 
-      if (response.requiresVerification == true) {
-        // Store email and navigate to verify OTP
-        if (mounted) {
-          Navigator.of(context).pushNamed(
-            AppRoutes.verifyOtp,
-            arguments: {'email': _emailController.text.trim()},
-          );
-        }
-      } else {
-        // Already verified or no verification needed
-        if (mounted) {
-          Navigator.of(context).pushReplacementNamed(AppRoutes.login);
-        }
+      await authService.register(request);
+
+      if (mounted) {
+        // Navigate to OTP verification page
+        NavigationHelper.pushTo(
+          context,
+          AppRoutes.verifyOtp,
+          arguments: {'email': _emailController.text.trim()},
+        );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString().replaceFirst('Exception: ', '')),
+            content: Text(e.toString()),
             backgroundColor: AppColors.error,
           ),
         );
@@ -89,14 +82,17 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        automaticallyImplyLeading: false,
-        backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
+        backgroundColor: AppColors.background,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          onPressed: () => NavigationHelper.goBack(context),
+        ),
+        title: Text('Create Account', style: AppTextStyles.h3),
+        centerTitle: true,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -106,60 +102,47 @@ class _RegisterPageState extends State<RegisterPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 40),
-                Text(
-                  'Daftar',
-                  style: AppTextStyles.h1(
-                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Buat akun baru untuk memulai',
-                  style: AppTextStyles.bodyMedium(
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 48),
-                InputField(
-                  label: 'Nama Lengkap',
-                  hint: 'Masukkan nama lengkap',
-                  controller: _usernameController,
-                  validator: Validators.username,
-                  prefixIcon: Icon(
-                    Icons.person_outlined,
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                  ),
-                ),
                 const SizedBox(height: 16),
-                InputField(
+
+                // Full name field
+                CustomTextField(
+                  label: 'Full Name',
+                  hint: 'Enter your full name',
+                  controller: _fullNameController,
+                  validator: Validators.fullName,
+                  textInputAction: TextInputAction.next,
+                  prefixIcon: const Icon(Icons.person_outlined),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Email field
+                CustomTextField(
                   label: 'Email',
-                  hint: 'Masukkan email',
+                  hint: 'Enter your email',
                   controller: _emailController,
                   validator: Validators.email,
                   keyboardType: TextInputType.emailAddress,
-                  prefixIcon: Icon(
-                    Icons.email_outlined,
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                  ),
+                  textInputAction: TextInputAction.next,
+                  prefixIcon: const Icon(Icons.email_outlined),
                 ),
+
                 const SizedBox(height: 16),
-                InputField(
+
+                // Password field
+                CustomTextField(
                   label: 'Password',
-                  hint: 'Masukkan password (min 8 karakter)',
+                  hint: 'Enter your password',
                   controller: _passwordController,
                   validator: Validators.password,
                   obscureText: _obscurePassword,
-                  prefixIcon: Icon(
-                    Icons.lock_outlined,
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                  ),
+                  textInputAction: TextInputAction.next,
+                  prefixIcon: const Icon(Icons.lock_outlined),
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                      _obscurePassword
+                          ? Icons.visibility
+                          : Icons.visibility_off,
                     ),
                     onPressed: () {
                       setState(() {
@@ -168,24 +151,27 @@ class _RegisterPageState extends State<RegisterPage> {
                     },
                   ),
                 ),
+
                 const SizedBox(height: 16),
-                InputField(
-                  label: 'Konfirmasi Password',
-                  hint: 'Konfirmasi password',
+
+                // Confirm password field
+                CustomTextField(
+                  label: 'Confirm Password',
+                  hint: 'Confirm your password',
                   controller: _confirmPasswordController,
-                  validator: (value) => Validators.confirmPassword(
-                    value,
-                    _passwordController.text,
-                  ),
+                  validator:
+                      (value) => Validators.confirmPassword(
+                        value,
+                        _passwordController.text,
+                      ),
                   obscureText: _obscureConfirmPassword,
-                  prefixIcon: Icon(
-                    Icons.lock_outlined,
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                  ),
+                  textInputAction: TextInputAction.done,
+                  prefixIcon: const Icon(Icons.lock_outlined),
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                      _obscureConfirmPassword
+                          ? Icons.visibility
+                          : Icons.visibility_off,
                     ),
                     onPressed: () {
                       setState(() {
@@ -194,44 +180,36 @@ class _RegisterPageState extends State<RegisterPage> {
                     },
                   ),
                 ),
-                const SizedBox(height: 24),
-                PrimaryButton(
-                  text: 'Daftar',
-                  onPressed: _handleRegister,
+
+                const SizedBox(height: 32),
+
+                // Register button
+                CustomButton(
+                  text: 'Create Account',
+                  onPressed: _register,
                   isLoading: _isLoading,
                 ),
+
                 const SizedBox(height: 24),
-                Center(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Sudah punya akun? ',
-                        style: AppTextStyles.bodyMedium(
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.of(context).pushNamed(AppRoutes.login);
-                        },
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                          minimumSize: const Size(60, 44),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: Text(
-                          'Masuk',
-                          style: AppTextStyles.bodyLarge(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+
+                // Sign in link
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      "Already have an account? ",
+                      style: AppTextStyles.bodyMedium,
+                    ),
+                    CustomTextButton(
+                      text: 'Sign In',
+                      onPressed: () {
+                        NavigationHelper.goBack(context);
+                      },
+                    ),
+                  ],
                 ),
+
+                const SizedBox(height: 16),
               ],
             ),
           ),
@@ -240,4 +218,3 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 }
-

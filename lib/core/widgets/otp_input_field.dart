@@ -13,18 +13,17 @@ class _OTPTextInputFormatter extends TextInputFormatter {
     if (newValue.text.length > 1) {
       return newValue;
     }
+    
     // For manual input, limit to 1 character
     if (newValue.text.length <= 1) {
       return newValue;
     }
+    
     return oldValue;
   }
 }
 
 class OTPInputField extends StatefulWidget {
-  static OTPInputFieldState of(BuildContext context) {
-    return context.findAncestorStateOfType<OTPInputFieldState>()!;
-  }
   final int length;
   final Function(String) onCompleted;
   final Function(String)? onChanged;
@@ -95,6 +94,7 @@ class OTPInputFieldState extends State<OTPInputField> {
         _otp[index] = '';
       });
       widget.onChanged?.call(_otp.join());
+
       // Move to previous field if available
       if (index > 0) {
         _focusNodes[index - 1].requestFocus();
@@ -107,7 +107,9 @@ class OTPInputFieldState extends State<OTPInputField> {
       setState(() {
         _otp[index] = value;
       });
+
       widget.onChanged?.call(_otp.join());
+
       // Move to next field
       if (index < widget.length - 1) {
         _focusNodes[index + 1].requestFocus();
@@ -166,22 +168,22 @@ class OTPInputFieldState extends State<OTPInputField> {
       widget.onCompleted(_otp.join());
     } else {
       // Focus on next empty field
-      final nextEmptyIndex = digits.length < widget.length ? digits.length : widget.length - 1;
+      final nextEmptyIndex =
+          digits.length < widget.length ? digits.length : widget.length - 1;
       _focusNodes[nextEmptyIndex].requestFocus();
     }
   }
 
+
   @override
   Widget build(BuildContext context) {
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: List.generate(widget.length, (index) => _buildOTPBox(index, isDark)),
+      children: List.generate(widget.length, (index) => _buildOTPBox(index)),
     );
   }
 
-  Widget _buildOTPBox(int index, bool isDark) {
+  Widget _buildOTPBox(int index) {
     final isFocused = _focusNodes[index].hasFocus;
     final hasValue = _otp[index].isNotEmpty;
 
@@ -212,35 +214,24 @@ class OTPInputFieldState extends State<OTPInputField> {
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w500,
-            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+            color: AppColors.textPrimary,
           ),
           decoration: InputDecoration(
             border: UnderlineInputBorder(
               borderSide: BorderSide(
-                color: isFocused || hasValue
-                    ? AppColors.primary
-                    : (isDark ? AppColors.borderDark : AppColors.border),
+                color:
+                    isFocused || hasValue ? AppColors.primary : AppColors.border,
                 width: isFocused ? 2 : 1,
               ),
             ),
             enabledBorder: UnderlineInputBorder(
               borderSide: BorderSide(
-                color: hasValue
-                    ? AppColors.primary
-                    : (isDark ? AppColors.borderDark : AppColors.border),
+                color: hasValue ? AppColors.primary : AppColors.border,
                 width: hasValue ? 2 : 1,
               ),
             ),
             focusedBorder: UnderlineInputBorder(
-              borderSide: const BorderSide(
-                color: AppColors.primary,
-                width: 2,
-              ),
-            ),
-            disabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(
-                color: (isDark ? AppColors.borderDark : AppColors.border).withOpacity(0.5),
-              ),
+              borderSide: BorderSide(color: AppColors.primary, width: 2),
             ),
             contentPadding: EdgeInsets.zero,
             counterText: '',
@@ -275,4 +266,3 @@ class OTPInputFieldState extends State<OTPInputField> {
   // Public method to get current OTP
   String getOTP() => _otp.join();
 }
-

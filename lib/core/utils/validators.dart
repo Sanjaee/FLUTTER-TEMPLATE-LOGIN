@@ -2,74 +2,92 @@ class Validators {
   // Email validation
   static String? email(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Email wajib diisi';
+      return 'Email is required';
     }
+    
     final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
     if (!emailRegex.hasMatch(value)) {
-      return 'Format email tidak valid';
+      return 'Please enter a valid email address';
     }
+    
     return null;
   }
-
+  
   // Password validation
   static String? password(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Password wajib diisi';
+      return 'Password is required';
     }
-    if (value.length < 8) {
-      return 'Password minimal 8 karakter';
+    
+    if (value.length < 6) {
+      return 'Password must be at least 6 characters';
     }
-    if (value.length > 128) {
-      return 'Password maksimal 128 karakter';
-    }
+    
     return null;
   }
-
-  // Username validation
-  static String? username(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Username wajib diisi';
-    }
-    if (value.length < 3) {
-      return 'Username minimal 3 karakter';
-    }
-    if (value.length > 50) {
-      return 'Username maksimal 50 karakter';
-    }
-    return null;
-  }
-
+  
   // Confirm password validation
-  static String? confirmPassword(String? value, String? originalPassword) {
+  static String? confirmPassword(String? value, String? password) {
     if (value == null || value.isEmpty) {
-      return 'Konfirmasi password wajib diisi';
+      return 'Please confirm your password';
     }
-    if (value != originalPassword) {
-      return 'Password tidak cocok';
+    
+    if (value != password) {
+      return 'Passwords do not match';
     }
+    
     return null;
   }
-
+  
+  // Full name validation
+  static String? fullName(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Full name is required';
+    }
+    
+    if (value.length < 2) {
+      return 'Full name must be at least 2 characters';
+    }
+    
+    return null;
+  }
+  
+  // Phone validation
+  static String? phone(String? value) {
+    if (value == null || value.isEmpty) {
+      return null; // Phone is optional
+    }
+    
+    if (value.length < 10) {
+      return 'Phone number must be at least 10 digits';
+    }
+    
+    return null;
+  }
+  
   // OTP validation
-  static String? otp(String? value, {int length = 6}) {
+  static String? otp(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Kode OTP wajib diisi';
+      return 'OTP is required';
     }
-    if (value.length != length) {
-      return 'Kode OTP harus $length digit';
+    
+    if (value.length != 6) {
+      return 'OTP must be 6 digits';
     }
-    if (!RegExp(r'^\d+$').hasMatch(value)) {
-      return 'Kode OTP harus berupa angka';
+    
+    final otpRegex = RegExp(r'^\d{6}$');
+    if (!otpRegex.hasMatch(value)) {
+      return 'OTP must contain only numbers';
     }
+    
     return null;
   }
-
+  
   // Required field validation
-  static String? required(String? value, {String fieldName = 'Field'}) {
-    if (value == null || value.isEmpty || value.trim().isEmpty) {
-      return '$fieldName wajib diisi';
+  static String? required(String? value, String fieldName) {
+    if (value == null || value.isEmpty) {
+      return '$fieldName is required';
     }
     return null;
   }
 }
-

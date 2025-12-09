@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // Primary Colors
-  static const Color primary = Color(0xFF2563EB); // Blue
+  // Primary Colors - Black and White theme
+  static const Color primary = Color(0xFF111827); // Black
   static const Color primaryDark = Color(0xFF1E40AF);
   static const Color primaryLight = Color(0xFF3B82F6);
+  static const Color secondary = Colors.white;
 
   // Background Colors
   static const Color background = Color(0xFFFFFFFF);
   static const Color backgroundDark = Color(0xFF111827);
   static const Color backgroundSecondary = Color(0xFFF9FAFB);
   static const Color backgroundSecondaryDark = Color(0xFF1F2937);
+  static const Color surface = Color(0xFFF3F4F6);
 
   // Text Colors
   static const Color textPrimary = Color(0xFF111827);
@@ -19,11 +21,13 @@ class AppColors {
   static const Color textSecondaryDark = Color(0xFF9CA3AF);
   static const Color textTertiary = Color(0xFF9CA3AF);
   static const Color textTertiaryDark = Color(0xFF6B7280);
+  static const Color textOnPrimary = Colors.white;
 
   // Border Colors
-  static const Color border = Color(0xFFE5E7EB);
+  static const Color border = Color(0xFF111827);
+  static const Color borderLight = Color(0xFFE5E7EB);
   static const Color borderDark = Color(0xFF374151);
-  static const Color borderFocus = Color(0xFF2563EB);
+  static const Color borderFocus = Color(0xFF111827);
 
   // Status Colors
   static const Color success = Color(0xFF10B981);
@@ -37,9 +41,15 @@ class AppColors {
   static const Color buttonSecondary = Color(0xFFFFFFFF);
   static const Color buttonSecondaryText = Color(0xFF111827);
   static const Color buttonSecondaryBorder = Color(0xFFE5E7EB);
+  static const Color buttonDisabled = Color(0xFF9CA3AF);
+
+  // Input field colors
+  static const Color inputBackground = Colors.white;
+  static const Color inputBorder = Color(0xFF111827);
+  static const Color inputBorderFocused = Color(0xFF111827);
+  static const Color inputBorderError = Color(0xFFEF4444);
 
   // Card Colors
   static const Color cardBackground = Color(0xFFFFFFFF);
   static const Color cardBackgroundDark = Color(0xFF1F2937);
 }
-

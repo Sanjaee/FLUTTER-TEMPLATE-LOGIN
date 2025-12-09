@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import '../../../core/widgets/primary_button.dart';
-import '../../../core/widgets/input_field.dart';
-import '../../../core/utils/validators.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/text_styles.dart';
+import '../../../core/constants/app_text_styles.dart';
+import '../../../core/widgets/custom_button.dart';
+import '../../../core/widgets/custom_text_field.dart';
+import '../../../core/utils/validators.dart';
+import '../../../core/utils/navigation.dart';
 import '../../../data/services/auth_service.dart';
-import '../../../data/services/api_service_factory.dart';
-import '../../../data/services/auth_storage_service.dart';
+import '../../../data/models/user_model.dart';
 import '../../../routes/app_routes.dart';
 
 class LoginPage extends StatefulWidget {
@@ -20,13 +20,8 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _obscurePassword = true;
   bool _isLoading = false;
-
-  final AuthService _authService = AuthService(
-    apiService: ApiServiceFactory.getInstance(),
-  );
-  final AuthStorageService _authStorage = AuthStorageService();
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -35,41 +30,101 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  Future<void> _handleLogin() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+  Future<void> _login() async {
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final response = await _authService.login(
+      final authService = AuthService();
+      final request = LoginRequest(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
 
-      if (response.accessToken != null && response.refreshToken != null) {
-        // Store tokens
-        await _authStorage.saveTokens(
-          accessToken: response.accessToken!,
-          refreshToken: response.refreshToken!,
-        );
-        
-        // Update API service with access token
-        ApiServiceFactory.getInstance().setAccessToken(response.accessToken);
-        
+      await authService.login(request);
+
+      if (mounted) {
         // Navigate to home
-        if (mounted) {
-          Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+        NavigationHelper.goToAndClearStack(context, AppRoutes.home);
+      }
+    } on EmailNotVerifiedException catch (e) {
+      // Auto resend OTP and redirect to OTP page
+      final email = e.email;
+      try {
+        final authService = AuthService();
+        await authService.resendOTP(email);
+      } catch (_) {}
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Email belum terverifikasi. OTP telah dikirim ulang.'),
+            backgroundColor: AppColors.warning,
+          ),
+        );
+        NavigationHelper.pushTo(
+          context,
+          AppRoutes.verifyOtp,
+          arguments: {'email': email, 'isPasswordReset': false},
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final authService = AuthService();
+      final res = await authService.signInWithGoogle();
+
+      if (mounted) {
+        // Check if profile is complete (has gender)
+        // If gender is null or empty, redirect to complete profile
+        if (res.user.gender == null || res.user.gender!.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please complete your profile'),
+              backgroundColor: AppColors.warning,
+            ),
+          );
+          NavigationHelper.goToAndClearStack(context, AppRoutes.completeProfile);
+        } else {
+          // Profile is complete, proceed to home
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Google Sign In successful!'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+          NavigationHelper.goToAndClearStack(context, AppRoutes.home);
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString().replaceFirst('Exception: ', '')),
+            content: Text(e.toString()),
             backgroundColor: AppColors.error,
           ),
         );
@@ -85,66 +140,62 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
-        elevation: 0,
-      ),
+      backgroundColor: AppColors.background,
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: Padding(
           padding: const EdgeInsets.all(24.0),
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 40),
+                const Spacer(),
+
+                // Logo/Title
                 Text(
-                  'Login',
-                  style: AppTextStyles.h1(
-                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                  ),
+                  'Welcome Back',
+                  style: AppTextStyles.h1,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Masuk ke akun Anda',
-                  style: AppTextStyles.bodyMedium(
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                  'Sign in to your account',
+                  style: AppTextStyles.bodyLarge.copyWith(
+                    color: AppColors.textSecondary,
                   ),
                   textAlign: TextAlign.center,
                 ),
+
                 const SizedBox(height: 48),
-                InputField(
+
+                // Email field
+                CustomTextField(
                   label: 'Email',
-                  hint: 'Masukkan email Anda',
+                  hint: 'Enter your email',
                   controller: _emailController,
                   validator: Validators.email,
                   keyboardType: TextInputType.emailAddress,
-                  prefixIcon: Icon(
-                    Icons.email_outlined,
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                  ),
+                  textInputAction: TextInputAction.next,
+                  prefixIcon: const Icon(Icons.email_outlined),
                 ),
+
                 const SizedBox(height: 16),
-                InputField(
+
+                // Password field
+                CustomTextField(
                   label: 'Password',
-                  hint: 'Masukkan password Anda',
+                  hint: 'Enter your password',
                   controller: _passwordController,
                   validator: Validators.password,
                   obscureText: _obscurePassword,
-                  prefixIcon: Icon(
-                    Icons.lock_outlined,
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                  ),
+                  textInputAction: TextInputAction.done,
+                  prefixIcon: const Icon(Icons.lock_outlined),
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                      _obscurePassword
+                          ? Icons.visibility
+                          : Icons.visibility_off,
                     ),
                     onPressed: () {
                       setState(() {
@@ -153,65 +204,77 @@ class _LoginPageState extends State<LoginPage> {
                     },
                   ),
                 ),
+
                 const SizedBox(height: 8),
+
+                // Forgot password
                 Align(
                   alignment: Alignment.centerRight,
-                  child: TextButton(
+                  child: CustomTextButton(
+                    text: 'Forgot Password?',
                     onPressed: () {
-                      Navigator.of(context).pushNamed(AppRoutes.resetPassword);
+                      NavigationHelper.pushTo(context, AppRoutes.resetPassword);
                     },
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      minimumSize: const Size(50, 44),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: Text(
-                      'Lupa Password?',
-                      style: AppTextStyles.bodyMedium(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
                   ),
                 ),
+
                 const SizedBox(height: 24),
-                PrimaryButton(
-                  text: 'Masuk',
-                  onPressed: _handleLogin,
+
+                // Login button
+                CustomButton(
+                  text: 'Sign In',
+                  onPressed: _login,
                   isLoading: _isLoading,
                 ),
+
                 const SizedBox(height: 24),
-                Center(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Belum punya akun? ',
-                        style: AppTextStyles.bodyMedium(
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+
+                // Divider
+                Row(
+                  children: [
+                    const Expanded(child: Divider()),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'OR',
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textSecondary,
                         ),
                       ),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.of(context).pushNamed(AppRoutes.register);
-                        },
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                          minimumSize: const Size(60, 44),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: Text(
-                          'Daftar',
-                          style: AppTextStyles.bodyLarge(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                    const Expanded(child: Divider()),
+                  ],
                 ),
+
+                const SizedBox(height: 24),
+
+                // Google OAuth button
+                CustomButton(
+                  text: 'Continue with Google',
+                  onPressed: _signInWithGoogle,
+                  isPrimary: false,
+                ),
+
+                const Spacer(),
+
+                // Sign up link
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      "Don't have an account? ",
+                      style: AppTextStyles.bodyMedium,
+                    ),
+                    CustomTextButton(
+                      text: 'Sign Up',
+                      onPressed: () {
+                        NavigationHelper.pushTo(context, AppRoutes.register);
+                      },
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
               ],
             ),
           ),
@@ -220,4 +283,3 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 }
-

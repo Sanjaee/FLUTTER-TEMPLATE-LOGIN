@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import '../../../core/widgets/custom_app_bar.dart';
-import '../../../core/widgets/primary_button.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/text_styles.dart';
+import '../../../core/constants/app_text_styles.dart';
+import '../../../core/widgets/custom_button.dart';
+import '../../../core/utils/navigation.dart';
 import '../../../routes/app_routes.dart';
 import '../../../data/models/user_model.dart';
-import '../../../data/services/auth_storage_service.dart';
-import '../../../data/services/api_service_factory.dart';
+import '../../../data/services/auth_service.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -16,7 +15,7 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  User? _user;
+  UserModel? _user;
   bool _isLoading = true;
 
   @override
@@ -26,22 +25,22 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _loadUserData() async {
-    // TODO: Load user data from storage or API
-    // For now, using mock data
-    setState(() {
-      _user = User(
-        id: '1',
-        email: 'user@example.com',
-        fullName: 'John Doe',
-        username: 'johndoe',
-        userType: 'member',
-        isActive: true,
-        isVerified: true,
-        loginType: 'credential',
-        createdAt: DateTime.now().toIso8601String(),
-      );
-      _isLoading = false;
-    });
+    try {
+      final authService = AuthService();
+      final user = await authService.getMe();
+      if (mounted) {
+        setState(() {
+          _user = user;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   Future<void> _handleLogout() async {
@@ -64,22 +63,11 @@ class _ProfilePageState extends State<ProfilePage> {
     );
 
     if (confirm == true && mounted) {
-      // Clear access token from API service first
-      ApiServiceFactory.getInstance().setAccessToken(null);
+      final authService = AuthService();
+      await authService.logout();
       
-      // Clear tokens from storage
-      final authStorage = AuthStorageService();
-      await authStorage.clearTokens();
-      
-      // Wait a bit to ensure tokens are cleared
-      await Future.delayed(const Duration(milliseconds: 100));
-      
-      // Navigate to login and remove ALL previous routes
       if (mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          AppRoutes.login,
-          (route) => false, // Remove all previous routes - cannot go back
-        );
+        NavigationHelper.goToAndClearStack(context, AppRoutes.login);
       }
     }
   }
@@ -90,16 +78,22 @@ class _ProfilePageState extends State<ProfilePage> {
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
-      appBar: CustomAppBar(
-        title: 'Profile',
+      appBar: AppBar(
+        backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
+        elevation: 0,
+        title: Text(
+          'Profile',
+          style: AppTextStyles.h3.copyWith(
+            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+          ),
+        ),
+        centerTitle: true,
         leading: IconButton(
           icon: Icon(
             Icons.arrow_back,
             color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
           ),
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
+          onPressed: () => NavigationHelper.goBack(context),
         ),
       ),
       body: SafeArea(
@@ -121,23 +115,28 @@ class _ProfilePageState extends State<ProfilePage> {
                           CircleAvatar(
                             radius: 50,
                             backgroundColor: AppColors.primary.withOpacity(0.1),
-                            child: Icon(
-                              Icons.person,
-                              size: 50,
-                              color: AppColors.primary,
-                            ),
+                            backgroundImage: _user?.profilePhoto != null
+                                ? NetworkImage(_user!.profilePhoto!)
+                                : null,
+                            child: _user?.profilePhoto == null
+                                ? Icon(
+                                    Icons.person,
+                                    size: 50,
+                                    color: AppColors.primary,
+                                  )
+                                : null,
                           ),
                           const SizedBox(height: 16),
                           Text(
                             _user?.fullName ?? 'N/A',
-                            style: AppTextStyles.h3(
+                            style: AppTextStyles.h3.copyWith(
                               color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             _user?.email ?? 'N/A',
-                            style: AppTextStyles.bodyMedium(
+                            style: AppTextStyles.bodyMedium.copyWith(
                               color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
                             ),
                           ),
@@ -153,19 +152,12 @@ class _ProfilePageState extends State<ProfilePage> {
                         color: isDark ? AppColors.cardBackgroundDark : AppColors.cardBackground,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: isDark ? AppColors.borderDark : AppColors.border,
+                          color: isDark ? AppColors.borderDark : AppColors.borderLight,
                         ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildDetailItem(
-                            context,
-                            'Username',
-                            _user?.username ?? 'Tidak ada',
-                            Icons.person_outline,
-                          ),
-                          const Divider(height: 32),
                           _buildDetailItem(
                             context,
                             'Email',
@@ -175,9 +167,23 @@ class _ProfilePageState extends State<ProfilePage> {
                           const Divider(height: 32),
                           _buildDetailItem(
                             context,
+                            'Phone',
+                            _user?.phone ?? 'Tidak ada',
+                            Icons.phone_outlined,
+                          ),
+                          const Divider(height: 32),
+                          _buildDetailItem(
+                            context,
                             'Tipe User',
                             _user?.userType ?? 'N/A',
                             Icons.badge_outlined,
+                          ),
+                          const Divider(height: 32),
+                          _buildDetailItem(
+                            context,
+                            'Gender',
+                            _user?.gender ?? 'Tidak ada',
+                            Icons.person_outline,
                           ),
                           const Divider(height: 32),
                           _buildDetailItem(
@@ -194,10 +200,10 @@ class _ProfilePageState extends State<ProfilePage> {
                     const SizedBox(height: 32),
                     
                     // Logout Button
-                    PrimaryButton(
+                    CustomButton(
                       text: 'Logout',
                       onPressed: _handleLogout,
-                      backgroundColor: AppColors.error,
+                      isPrimary: true,
                     ),
                   ],
                 ),
@@ -230,16 +236,16 @@ class _ProfilePageState extends State<ProfilePage> {
             children: [
               Text(
                 label,
-                style: AppTextStyles.bodySmall(
+                style: AppTextStyles.bodySmall.copyWith(
                   color: isDark ? AppColors.textTertiaryDark : AppColors.textTertiary,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 value,
-                style: AppTextStyles.bodyMedium(
-                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                style: AppTextStyles.bodyMedium.copyWith(
                   fontWeight: FontWeight.w500,
+                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
                 ),
               ),
             ],
@@ -249,4 +255,3 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 }
-

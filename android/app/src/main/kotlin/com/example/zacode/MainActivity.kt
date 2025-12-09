@@ -1,5 +1,6 @@
-package com.example.mobile
+package com.example.zacode
 
 import io.flutter.embedding.android.FlutterActivity
 
 class MainActivity : FlutterActivity()
+

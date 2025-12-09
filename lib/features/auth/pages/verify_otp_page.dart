@@ -1,19 +1,22 @@
-import 'package:flutter/material.dart';
 import 'dart:async';
-import '../../../core/widgets/otp_input_field.dart';
+import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/text_styles.dart';
+import '../../../core/constants/app_text_styles.dart';
+import '../../../core/widgets/otp_input_field.dart';
+import '../../../core/utils/navigation.dart';
+import '../../../core/utils/storage_helper.dart';
 import '../../../data/services/auth_service.dart';
-import '../../../data/services/api_service_factory.dart';
-import '../../../data/services/auth_storage_service.dart';
+import '../../../data/models/user_model.dart';
 import '../../../routes/app_routes.dart';
 
 class VerifyOtpPage extends StatefulWidget {
   final String email;
+  final bool isPasswordReset;
 
   const VerifyOtpPage({
     super.key,
     required this.email,
+    this.isPasswordReset = false,
   });
 
   @override
@@ -21,25 +24,18 @@ class VerifyOtpPage extends StatefulWidget {
 }
 
 class _VerifyOtpPageState extends State<VerifyOtpPage> {
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  final GlobalKey<OTPInputFieldState> _otpFieldKey = GlobalKey<OTPInputFieldState>();
-  String _currentOtp = '';
-  
+  final _formKey = GlobalKey<FormState>();
+  final GlobalKey<OTPInputFieldState> _otpKey = GlobalKey<OTPInputFieldState>();
   bool _isLoading = false;
-  bool _isVerifying = false;
-  int _timeLeft = 0;
-  bool _canResend = true;
+  bool _isResending = false;
+  String _currentOTP = '';
+  int _resendTimer = 0; // Start with 0 - button can be clicked immediately
   Timer? _timer;
-
-  final AuthService _authService = AuthService(
-    apiService: ApiServiceFactory.getInstance(),
-  );
-  final AuthStorageService _authStorage = AuthStorageService();
+  bool _hasResentOnce = false; // Track if user has clicked resend at least once
 
   @override
   void initState() {
     super.initState();
-    // Start with 0 countdown - user can resend immediately
   }
 
   @override
@@ -48,228 +44,319 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
     super.dispose();
   }
 
-  void _startCountdown() {
-    setState(() {
-      _timeLeft = 30;
-      _canResend = false;
-    });
-
-    _timer?.cancel();
+  void _startResendTimer() {
+    _resendTimer = 60;
+    _hasResentOnce = true;
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (mounted) {
+      if (_resendTimer > 0) {
         setState(() {
-          if (_timeLeft > 0) {
-            _timeLeft--;
-          } else {
-            _canResend = true;
-            timer.cancel();
-          }
+          _resendTimer--;
         });
+      } else {
+        timer.cancel();
       }
     });
   }
 
-  Future<void> _verifyOtp(String otp) async {
+  Future<void> _verifyOTP([String? otpCode]) async {
+    final otp = otpCode ?? _currentOTP;
+
+    if (otp.length != 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid 6-digit OTP'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
     setState(() {
-      _isVerifying = true;
       _isLoading = true;
     });
 
     try {
-      final response = await _authService.verifyOTP(
-        email: widget.email,
-        otpCode: otp,
-      );
-
-      if (response.accessToken != null && response.refreshToken != null) {
-        // Store tokens
-        await _authStorage.saveTokens(
-          accessToken: response.accessToken!,
-          refreshToken: response.refreshToken!,
-        );
-        
-        // Update API service with access token
-        ApiServiceFactory.getInstance().setAccessToken(response.accessToken);
-        
-        // Navigate to home
+      if (widget.isPasswordReset) {
+        // For password reset, navigate to change password page with email and OTP
+        // The actual verification + password change will be done in one API call
         if (mounted) {
-          Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('OTP entered. Please set your new password.'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+          // Navigate to change password page with email and OTP
+          NavigationHelper.pushTo(
+            context,
+            AppRoutes.changePassword,
+            arguments: {'email': widget.email, 'otpCode': otp},
+          );
+        }
+      } else {
+        // Regular OTP verification for registration
+        final authService = AuthService();
+        final request = OTPVerifyRequest(email: widget.email, otpCode: otp);
+
+        final res = await authService.verifyOTP(request);
+
+        if (mounted) {
+          // Save user type
+          await StorageHelper.saveUserType(res.user.userType);
+          
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Account verified successfully!'),
+              backgroundColor: AppColors.success,
+              duration: Duration(seconds: 2),
+            ),
+          );
+          
+          // Navigate to home after a short delay to ensure state is saved
+          await Future.delayed(const Duration(milliseconds: 500));
+          
+          if (mounted) {
+            NavigationHelper.goToAndClearStack(context, AppRoutes.home);
+          }
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceFirst('Exception: ', '')),
-            backgroundColor: AppColors.error,
-          ),
-        );
-        // Clear OTP on error
-        _otpFieldKey.currentState?.clear();
+        String errorMessage = e.toString();
+
+        // Check if this is a password reset OTP error
+        if (errorMessage.contains('OTP_FOR_PASSWORD_RESET') ||
+            errorMessage.contains('password reset')) {
+          // Redirect to password reset flow
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('This OTP is for password reset. Redirecting...'),
+              backgroundColor: AppColors.warning,
+            ),
+          );
+
+          // Navigate to reset password page
+          NavigationHelper.pushTo(context, AppRoutes.resetPassword);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: AppColors.error,
+            ),
+          );
+          // Clear OTP on error
+          _otpKey.currentState?.clear();
+        }
       }
     } finally {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _isVerifying = false;
         });
       }
     }
   }
 
-  Future<void> _resendOtp() async {
-    if (!_canResend) return;
-
-    _startCountdown();
+  Future<void> _resendOTP() async {
+    setState(() {
+      _isResending = true;
+    });
 
     try {
-      await _authService.resendOTP(email: widget.email);
+      final authService = AuthService();
+      await authService.resendOTP(widget.email);
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Kode OTP telah dikirim ulang'),
+            content: Text('OTP sent successfully'),
             backgroundColor: AppColors.success,
           ),
         );
-        _otpFieldKey.currentState?.clear();
+        // Clear current OTP input
+        _otpKey.currentState?.clear();
+        // Restart the timer
+        _startResendTimer();
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString().replaceFirst('Exception: ', '')),
+            content: Text(e.toString()),
             backgroundColor: AppColors.error,
           ),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isResending = false;
+        });
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
-        elevation: 0,
-      ),
+      backgroundColor: AppColors.background,
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: Padding(
           padding: const EdgeInsets.all(24.0),
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 40),
-                Icon(
-                  Icons.email_outlined,
-                  size: 48,
-                  color: AppColors.primary,
+                // Back button
+                Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        Icons.arrow_back,
+                        color: AppColors.textPrimary,
+                      ),
+                      onPressed: () => NavigationHelper.goBack(context),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 24),
-                Text(
-                  'Verifikasi OTP',
-                  style: AppTextStyles.h1(
-                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+
+                const Spacer(),
+
+                // Icon
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: Colors.transparent,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.primary, width: 2),
                   ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Kode verifikasi telah dikirim ke',
-                  style: AppTextStyles.bodyMedium(
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  widget.email,
-                  style: AppTextStyles.bodyMedium(
+                  child: Icon(
+                    widget.isPasswordReset
+                        ? Icons.lock_reset
+                        : Icons.sms_outlined,
                     color: AppColors.primary,
-                    fontWeight: FontWeight.w600,
+                    size: 30,
+                  ),
+                ),
+
+                const SizedBox(height: 32),
+
+                // Title
+                Text(
+                  'Masukkan Kode Verifikasi',
+                  style: AppTextStyles.h2.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
                   ),
                   textAlign: TextAlign.center,
                 ),
+
+                const SizedBox(height: 12),
+
+                // Description
+                Text(
+                  widget.isPasswordReset
+                      ? 'Kode verifikasi telah dikirimkan melalui email ke ${widget.email}'
+                      : 'Kode verifikasi telah dikirimkan melalui email ke ${widget.email}',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+
                 const SizedBox(height: 48),
+
+                // OTP input field
                 OTPInputField(
-                  key: _otpFieldKey,
+                  key: _otpKey,
                   length: 6,
-                  onCompleted: _verifyOtp,
-                  onChanged: (otp) {
+                  onCompleted: _verifyOTP,
+                  onChanged: (value) {
                     setState(() {
-                      _currentOtp = otp;
+                      _currentOTP = value;
                     });
                   },
-                  enabled: !_isLoading && !_isVerifying,
                 ),
-                const SizedBox(height: 16),
-                if (_isVerifying)
-                  Center(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Memverifikasi kode...',
-                          style: AppTextStyles.bodySmall(
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                const SizedBox(height: 24),
-                if (!_canResend)
-                  Center(
-                    child: Text(
-                      'Kirim ulang kode dalam ${_timeLeft}s',
-                      style: AppTextStyles.bodySmall(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+
+                const SizedBox(height: 48),
+
+                // Verify button
+                SizedBox(
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed:
+                        _currentOTP.length == 6 && !_isLoading
+                            ? () => _verifyOTP(_currentOTP)
+                            : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      disabledBackgroundColor: AppColors.borderLight,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
+                      elevation: 0,
                     ),
-                  )
-                else
-                  Center(
-                    child: Column(
-                      children: [
-                        Text(
-                          'Tidak menerima email?',
-                          style: AppTextStyles.bodySmall(
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        TextButton(
-                          onPressed: _resendOtp,
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            minimumSize: const Size(120, 48),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: Text(
-                            'Kirim Ulang Kode',
-                            style: AppTextStyles.bodyLarge(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w600,
+                    child:
+                        _isLoading
+                            ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            )
+                            : Text(
+                              'Verifikasi',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
+                ),
+
+                const SizedBox(height: 24),
+
+                // Resend OTP with timer
+                Center(
+                  child: _resendTimer > 0
+                      ? Text(
+                          "Mohon menunggu ${_resendTimer} detik untuk mengirim ulang",
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        )
+                      : TextButton(
+                          onPressed: _isResending ? null : _resendOTP,
+                          child: _isResending
+                              ? SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      AppColors.primary,
+                                    ),
+                                  ),
+                                )
+                              : Text(
+                                  _hasResentOnce ? 'Kirim Ulang OTP' : 'Kirim Ulang OTP',
+                                  style: AppTextStyles.bodyMedium.copyWith(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                        ),
+                ),
+
+                const Spacer(),
               ],
             ),
           ),
@@ -278,4 +365,3 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
     );
   }
 }
-

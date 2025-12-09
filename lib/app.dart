@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'core/constants/app_colors.dart';
+import 'core/constants/app_text_styles.dart';
 import 'core/middleware/auth_guard.dart';
 import 'features/auth/pages/login_page.dart';
 import 'features/auth/pages/register_page.dart';
 import 'features/auth/pages/verify_otp_page.dart';
 import 'features/auth/pages/reset_password_page.dart';
-import 'features/auth/pages/verify_otp_reset_page.dart';
-import 'features/auth/pages/verify_reset_password_page.dart';
+import 'features/auth/pages/change_password_page.dart';
+import 'features/auth/pages/complete_profile_page.dart';
 import 'features/home/pages/home_page.dart';
 import 'features/profile/pages/profile_page.dart';
+import 'features/splash/pages/splash_page.dart';
 import 'routes/app_routes.dart';
 
 class MyApp extends StatelessWidget {
@@ -17,7 +19,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'BeRealTime',
+      title: 'Zacode',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
@@ -27,6 +29,64 @@ class MyApp extends StatelessWidget {
           onSurface: AppColors.textPrimary,
         ),
         scaffoldBackgroundColor: AppColors.background,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: AppColors.background,
+          foregroundColor: AppColors.textPrimary,
+          elevation: 0,
+          centerTitle: true,
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.buttonPrimary,
+            foregroundColor: AppColors.textOnPrimary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            elevation: 0,
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: AppColors.inputBackground,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: AppColors.inputBorder),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: AppColors.inputBorder),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(
+              color: AppColors.inputBorderFocused,
+              width: 2,
+            ),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: AppColors.inputBorderError),
+          ),
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(
+              color: AppColors.inputBorderError,
+              width: 2,
+            ),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
+          ),
+        ),
+        textTheme: TextTheme(
+          headlineLarge: AppTextStyles.h1,
+          headlineMedium: AppTextStyles.h2,
+          headlineSmall: AppTextStyles.h3,
+          bodyLarge: AppTextStyles.bodyLarge,
+          bodyMedium: AppTextStyles.bodyMedium,
+          bodySmall: AppTextStyles.bodySmall,
+        ),
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
@@ -37,8 +97,8 @@ class MyApp extends StatelessWidget {
         ),
         scaffoldBackgroundColor: AppColors.backgroundDark,
       ),
-      themeMode: ThemeMode.system,
-      initialRoute: AppRoutes.login,
+      themeMode: ThemeMode.light,
+      initialRoute: AppRoutes.splash,
       onGenerateRoute: (settings) {
         return _buildRoute(settings);
       },
@@ -49,24 +109,28 @@ class MyApp extends StatelessWidget {
     // Apply auth guard middleware
     return _createGuardedRoute(settings, () {
       switch (settings.name) {
+        case AppRoutes.splash:
+          return const SplashPage();
         case AppRoutes.login:
           return const LoginPage();
         case AppRoutes.register:
           return const RegisterPage();
         case AppRoutes.verifyOtp:
           final args = settings.arguments as Map<String, dynamic>?;
-          return VerifyOtpPage(email: args?['email'] ?? '');
+          return VerifyOtpPage(
+            email: args?['email'] ?? '',
+            isPasswordReset: args?['isPasswordReset'] ?? false,
+          );
         case AppRoutes.resetPassword:
           return const ResetPasswordPage();
-        case AppRoutes.verifyOtpReset:
+        case AppRoutes.changePassword:
           final args = settings.arguments as Map<String, dynamic>?;
-          return VerifyOtpResetPage(email: args?['email'] ?? '');
-        case AppRoutes.verifyResetPassword:
-          final args = settings.arguments as Map<String, dynamic>?;
-          return VerifyResetPasswordPage(
+          return ChangePasswordPage(
             email: args?['email'] ?? '',
-            otp: args?['otp'] ?? '',
+            otpCode: args?['otpCode'] ?? '',
           );
+        case AppRoutes.completeProfile:
+          return const CompleteProfilePage();
         case AppRoutes.home:
           return const HomePage();
         case AppRoutes.profile:
@@ -96,7 +160,6 @@ class MyApp extends StatelessWidget {
       },
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
         // Ultra-smooth fade with subtle scale for premium feel
-        // No slide = no patah-patah, just clean and smooth
         
         // Main fade animation with smooth curve
         final fadeAnimation = Tween<double>(
@@ -105,18 +168,18 @@ class MyApp extends StatelessWidget {
         ).animate(
           CurvedAnimation(
             parent: animation,
-            curve: const SmoothFadeCurve(), // Custom ultra-smooth curve
+            curve: const SmoothFadeCurve(),
           ),
         );
 
-        // Subtle scale animation for depth (95% to 100%)
+        // Subtle scale animation for depth (98% to 100%)
         final scaleAnimation = Tween<double>(
           begin: 0.98,
           end: 1.0,
         ).animate(
           CurvedAnimation(
             parent: animation,
-            curve: const SmoothScaleCurve(), // Smooth scale curve
+            curve: const SmoothScaleCurve(),
           ),
         );
 
@@ -129,34 +192,28 @@ class MyApp extends StatelessWidget {
           ),
         );
       },
-      transitionDuration: const Duration(milliseconds: 300), // Fast and smooth
+      transitionDuration: const Duration(milliseconds: 300),
     );
   }
 }
 
-// Ultra-smooth fade curve - no patah-patah, just clean animation
-// Using cubic ease-out for buttery smooth feel (similar to iOS animations)
+// Ultra-smooth fade curve
 class SmoothFadeCurve extends Curve {
   const SmoothFadeCurve();
 
   @override
   double transformInternal(double t) {
-    // Cubic ease-out: smooth start, very smooth end
-    // Formula: 1 - (1-t)^3 for natural deceleration
     final double invT = 1.0 - t;
     return 1.0 - (invT * invT * invT);
   }
 }
 
-// Smooth scale curve - subtle zoom for premium feel
-// Matches fade timing for synchronized smoothness
+// Smooth scale curve
 class SmoothScaleCurve extends Curve {
   const SmoothScaleCurve();
 
   @override
   double transformInternal(double t) {
-    // Slightly faster scale for natural feel
-    // Ease-out cubic with faster start
     final double invT = 1.0 - t;
     return 1.0 - (invT * invT);
   }
@@ -186,6 +243,14 @@ class _AuthGuardWidgetState extends State<_AuthGuardWidget> {
   }
 
   Future<void> _checkAuth() async {
+    // Skip auth check for splash page
+    if (widget.routeName == AppRoutes.splash) {
+      setState(() {
+        _isChecking = false;
+      });
+      return;
+    }
+
     // First check: if user is logged in and trying to access auth route
     var redirectTo = await AuthGuard.guardAuthRoute(
       widget.routeName,
@@ -226,6 +291,4 @@ class _AuthGuardWidgetState extends State<_AuthGuardWidget> {
 
     return widget.child;
   }
-
 }
-
