@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Allow HTTPS connections to Vercel and other trusted domains -->
+    <domain-config cleartextTrafficPermitted="false">
+        <!-- Vercel domain -->
+        <domain includeSubdomains="true">express-template-login.vercel.app</domain>
+        <domain includeSubdomains="true">*.vercel.app</domain>
+        
+        <!-- Trust system certificates -->
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+    
+    <!-- Base configuration: allow all HTTPS with system certificates -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
+

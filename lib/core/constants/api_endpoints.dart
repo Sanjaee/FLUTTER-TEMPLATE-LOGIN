@@ -1,7 +1,7 @@
 class ApiEndpoints {
   // Base URL - sesuaikan dengan backend server
   // Untuk development lokal, gunakan IP address atau localhost
-  static const String baseUrl = 'http://192.168.194.248:5000';
+  static const String baseUrl = 'https://express-template-login.vercel.app';
   
   // API version prefix
   static const String apiV1 = '$baseUrl/api/v1';
